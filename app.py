@@ -29,7 +29,9 @@ def get_pro_stock_data(tickers):
             stock = yf.Ticker(ticker)
             info = stock.info
             
-            # ડેટા પ્રોસેસિંગ
+            if not info or 'shortName' not in info:
+                continue
+                
             current_price = info.get('currentPrice', info.get('regularMarketPrice', 0))
             dma_200 = info.get('twoHundredDayAverage', 0)
             dma_50 = info.get('fiftyDayAverage', 0)
@@ -41,28 +43,56 @@ def get_pro_stock_data(tickers):
             elif current_price < dma_200: action = "🔴 Exit"
             elif current_price <= dma_50 * 1.05: action = "🟢 Buy"
 
+            upside = ((target-current_price)/current_price)*100 if target > current_price else 0
+
             data.append({
                 "Company": info.get('shortName', ticker),
                 "Symbol": ticker,
                 "Action": action,
                 "Price": round(current_price, 2),
+                "Buy Zone": round(dma_50, 2),
                 "Target": round(target, 2),
-                "Upside%": round(((target-current_price)/current_price)*100, 2) if target > current_price else 0,
+                "Upside%": round(upside, 2),
+                "200 DMA": round(dma_200, 2),
+                "Div%": round((info.get('dividendYield', 0) or 0) * 100, 2),
                 "ROE%": round((info.get('returnOnEquity', 0) or 0) * 100, 2),
                 "Debt": round((info.get('debtToEquity', 0) or 0) / 100, 2)
             })
-        except: continue
-    return pd.DataFrame(data)
+        except: 
+            continue
+            
+    if data:
+        df = pd.DataFrame(data)
+        # કોલમને કાયમ માટે અહી ફિક્સ કરી દીધા છે
+        cols = ["Company", "Symbol", "Action", "Price", "Buy Zone", "Target", "Upside%", "200 DMA", "Div%", "ROE%", "Debt"]
+        return df[cols]
+    return pd.DataFrame()
 
-# ડેટા લોડિંગ
 with st.spinner('માર્કેટ ડેટા ફેચ થઈ રહ્યો છે...'):
     df = get_pro_stock_data(nifty_50)
 
-# ટેબલ દર્શાવવા માટે (ફુલ વિડ્થ સાથે)
 if not df.empty:
-    st.subheader("📊 Nifty 50 માર્કેટ ડેશબોર્ડ")
-    # આ લાઈનથી ટેબલ આખી સ્ક્રીન પર ફેલાઈ જશે
-    st.dataframe(df, use_container_width=True, height=600) 
-    st.info("💡 ઉપરના ટેબલમાં કોઈપણ હેડર (જેમ કે 'Upside%') પર ક્લિક કરીને તમે શેરોને ગોઠવી શકો છો.")
+    st.write("---")
+    st.subheader("✅ ૧. સ્ક્રીનર: અત્યારે કયા નવા શેર લેવા જેવા છે?")
+    
+    # શરતો
+    filtered_df = df[
+        (df["Price"] > df["200 DMA"]) & 
+        (df["Upside%"] > 5.0) & 
+        (df["ROE%"] > 10.0)
+    ].sort_values(by="Upside%", ascending=False)
+    
+    if not filtered_df.empty:
+        # hide_index=True થી 0,1,2 નીકળી જશે, use_container_width=True થી મોટું થશે
+        st.dataframe(filtered_df, use_container_width=True, hide_index=True)
+    else:
+        st.warning("અત્યારે માર્કેટમાં કોઈ નવો શેર લેવા જેવો નથી.")
+
+    st.write("---")
+    st.subheader("📊 ૨. એક્ઝિટ ટ્રેકર: Nifty 50 ના તમામ શેરોનું સ્ટેટસ")
+    # આ ટેબલ આખી સ્ક્રીન પર લાંબુ દેખાશે
+    st.dataframe(df, use_container_width=True, hide_index=True, height=600) 
+
 else:
     st.error("સર્વર બીઝી છે, થોડીવાર પછી રિફ્રેશ કરો.")
+        
