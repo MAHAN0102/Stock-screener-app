@@ -5,9 +5,8 @@ import pandas as pd
 st.set_page_config(layout="wide")
 
 st.title("🚀 Nifty 50 Pro Screener & Exit Tracker")
-st.write("આ એપ વિદેશી ફંડો (FII) ની જેમ 'ક્વોન્ટ મોડેલ' (ફંડામેન્ટલ + ટેકનિકલ) પર કામ કરે છે.")
+st.write("આ એપ વિદેશી ફંડોની સ્માર્ટ પદ્ધતિનો ઉપયોગ કરીને આપણા **ભારતીય માર્કેટ (Nifty 50)** નું સચોટ એનાલિસિસ કરે છે.")
 
-# Nifty 50 ના તમામ શેરોનું લિસ્ટ
 nifty_50 = [
     "ADANIENT.NS", "ADANIPORTS.NS", "APOLLOHOSP.NS", "ASIANPAINT.NS", "AXISBANK.NS", 
     "BAJAJ-AUTO.NS", "BAJFINANCE.NS", "BAJAJFINSV.NS", "BPCL.NS", "BHARTIARTL.NS", 
@@ -21,7 +20,7 @@ nifty_50 = [
     "TITAN.NS", "ULTRACEMCO.NS", "WIPRO.NS"
 ]
 
-@st.cache_data(ttl=3600) # ડેટાને 1 કલાક સેવ રાખશે જેથી એપ ફાસ્ટ ચાલે
+@st.cache_data(ttl=3600)
 def get_pro_stock_data(tickers):
     data = []
     for ticker in tickers:
@@ -46,7 +45,7 @@ def get_pro_stock_data(tickers):
             if target_price and current_price and target_price > current_price:
                 upside = ((target_price - current_price) / current_price) * 100
 
-            # એક્ઝિટ અને બાય માટેનું ઓટોમેટિક એલર્ટ (AI Logic)
+            # એક્ઝિટ અને બાય માટેનું ઓટોમેટિક એલર્ટ 
             if current_price >= target_price and target_price > 0:
                 action = "🔴 Sell (Target Hit)"
             elif current_price < dma_200:
@@ -59,8 +58,8 @@ def get_pro_stock_data(tickers):
             data.append({
                 "Company": name,
                 "Symbol": ticker,
-                "Price (₹)": round(current_price, 2),
                 "Action (Alert)": action,
+                "Price (₹)": round(current_price, 2),
                 "Buy Zone (₹)": round(dma_50, 2),
                 "Target (₹)": round(target_price, 2),
                 "Upside %": round(upside, 2),
@@ -74,32 +73,37 @@ def get_pro_stock_data(tickers):
             
     if not data:
         return pd.DataFrame()
-    return pd.DataFrame(data)
+        
+    df = pd.DataFrame(data)
+    # અહીં આપણે કોલમને હંમેશ માટે ફિક્સ (Lock) કરી દીધા છે!
+    cols = ["Company", "Symbol", "Action (Alert)", "Price (₹)", "Buy Zone (₹)", "Target (₹)", "Upside %", "200 DMA (₹)", "Dividend %", "ROE %", "Debt"]
+    return df[cols]
 
-st.write("માર્કેટમાંથી Nifty 50 નો લાઈવ ડેટા ખેંચી રહ્યા છીએ... (૫૦ શેર હોવાથી ૩૦ સેકન્ડ લાગી શકે છે ⏳)")
+st.write("માર્કેટમાંથી Nifty 50 નો લાઈવ ડેટા ખેંચી રહ્યા છીએ... ⏳")
 df = get_pro_stock_data(nifty_50)
 
 if not df.empty:
     st.write("---")
-    st.subheader("✅ ૧. સ્ક્રીનર: અત્યારે કયા નવા શેર લેવા જેવા છે?")
-    st.write("જે શેરો આપણી કડક શરતો (ફંડામેન્ટલ + 200 DMA) પાસ કરે છે, તે જ અહીં દેખાશે.")
+    st.subheader("✅ ૧. બેસ્ટ રોકાણ (નવા શેર કયા લેવા?)")
+    st.write("શરત: જે નિફ્ટીના શેરો અપટ્રેન્ડ (200 DMA ની ઉપર) માં છે અને તેમાં ભવિષ્યમાં સારો નફો (Upside) મળવાની શક્યતા છે.")
     
+    # નવી પ્રેક્ટિકલ શરતો (બેન્કોને પણ ગણતરીમાં લેશે)
     filtered_df = df[
-        (df["Dividend %"] > 1.5) & 
-        (df["ROE %"] > 15.0) & 
-        (df["Debt"] < 0.5) &
-        (df["Price (₹)"] > df["200 DMA (₹)"])
+        (df["Price (₹)"] > df["200 DMA (₹)"]) & 
+        (df["Upside %"] > 5.0) & 
+        (df["ROE %"] > 10.0)
     ].sort_values(by="Upside %", ascending=False)
     
     if not filtered_df.empty:
         st.dataframe(filtered_df.style.format(precision=2), hide_index=True)
     else:
-        st.warning("અત્યારે માર્કેટમાં આપણી કડક શરતો પાસ કરે તેવી કોઈ કંપની નથી.")
+        st.warning("અત્યારે માર્કેટમાં નવા રોકાણ માટે યોગ્ય શેર મળી રહ્યા નથી.")
 
     st.write("---")
     st.subheader("📊 ૨. એક્ઝિટ ટ્રેકર: Nifty 50 ના તમામ શેરોનું સ્ટેટસ")
-    st.write("**Action કોલમ જુઓ:** જો તમે કોઈ શેર લીધો હોય અને તેમાં 'Exit (Downtrend)' કે 'Sell' દેખાય, તો તે વેચવાનો સમય છે.")
+    st.write("**Action કોલમ જુઓ:** નવો શેર 'Best Buy Zone' માં લેવો, અને 'Sell' કે 'Exit' આવે ત્યારે વેચી દેવો.")
     st.dataframe(df.style.format(precision=2), hide_index=True)
 
 else:
     st.error("સર્વર કનેક્શનમાં વિલંબ. કૃપા કરીને થોડીવાર પછી પેજ રિફ્રેશ કરો.")
+            
