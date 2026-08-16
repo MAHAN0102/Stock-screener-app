@@ -14,6 +14,10 @@ def get_stock_data(tickers):
         try:
             stock = yf.Ticker(ticker)
             info = stock.info
+            
+            if not info or 'shortName' not in info:
+                continue
+                
             name = info.get('shortName', ticker)
             div_yield = info.get('dividendYield', 0)
             div_yield = div_yield * 100 if div_yield else 0
@@ -31,6 +35,10 @@ def get_stock_data(tickers):
             })
         except Exception as e:
             pass
+            
+    # જો ડેટા ન મળે તો ખાલી કોલમ બનાવી દેશે જેથી KeyError ન આવે
+    if not data:
+        return pd.DataFrame(columns=["Company", "Symbol", "Dividend %", "ROE %", "Debt"])
     return pd.DataFrame(data)
 
 st.write("માર્કેટમાંથી ડેટા લાવી રહ્યા છીએ... (કૃપા કરીને રાહ જુઓ)")
@@ -40,15 +48,18 @@ st.write("---")
 st.subheader("✅ આપણી શરતો મુજબ પાસ થયેલા બેસ્ટ શેર્સ")
 st.write("શરતો: ડિવિડન્ડ 1.5% થી વધુ, ROE 15% થી વધુ, અને દેવું 0.5 થી ઓછું હોવું જોઈએ.")
 
-filtered_df = df[
-    (df["Dividend %"] > 1.5) & 
-    (df["ROE %"] > 15.0) & 
-    (df["Debt"] < 0.5)
-]
+# ડેટા આવ્યો હોય તો જ ફિલ્ટર લાગુ પડશે
+if not df.empty:
+    filtered_df = df[
+        (df["Dividend %"] > 1.5) & 
+        (df["ROE %"] > 15.0) & 
+        (df["Debt"] < 0.5)
+    ]
+    st.dataframe(filtered_df)
 
-st.dataframe(filtered_df)
-
-if not filtered_df.empty:
-    st.success("🎉 અભિનંદન! આ એવા શેર્સ છે જે નિયમિત ડિવિડન્ડ આપે છે, દેવું ઓછું છે અને નફો સારો છે!")
+    if not filtered_df.empty:
+        st.success("🎉 અભિનંદન! આ એવા શેર્સ છે જે નિયમિત ડિવિડન્ડ આપે છે, દેવું ઓછું છે અને નફો સારો છે!")
+    else:
+        st.warning("અત્યારે આ શરતો પાસ કરે તેવી કોઈ કંપની નથી મળી.")
 else:
-    st.warning("અત્યારે આ શરતો પાસ કરે તેવી કોઈ કંપની નથી મળી.")
+    st.error("અત્યારે સર્વરમાંથી માર્કેટ ડેટા લાવવામાં વિલંબ થઈ રહ્યો છે. કૃપા કરીને થોડીવાર પછી પેજ રિફ્રેશ કરો.")
